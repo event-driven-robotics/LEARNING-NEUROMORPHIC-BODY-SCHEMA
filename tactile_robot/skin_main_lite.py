@@ -1,4 +1,4 @@
-import serial
+import serial #serial can be imported using pip/pip3/conda install pyserial
 import numpy as np
 
 import os
@@ -7,7 +7,7 @@ import csv
 from datetime import datetime, timedelta  # Import datetime module for getting the current time
 
 #csv_filename ="~/your_git_repo_name/tactilerobot/sm_events.csv"
-csv_filename = os.path.join(os.getcwd(), "tactile_events.csv")
+csv_filename = os.path.join(os.getcwd(), "./tactilerobot/tactile_events.csv")
 
 # Serial configuration (can change if Linux or Mac)
 # the port can change for each reconnexion.

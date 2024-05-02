@@ -1,4 +1,4 @@
-import serial
+import serial #serial can be imported using pip/pip3/conda install pyserial
 import numpy as np
 
 from scipy.ndimage import convolve1d
@@ -14,10 +14,13 @@ import os
 import csv
 from datetime import datetime, timedelta  # Import datetime module for getting the current time
 
-csv_filename ="/home/abdelnasser/Git_projects/tactilerobot/DexArm_API/pydexarm/sm_events.csv"
-# Configuration
-port1 = "/dev/ttyUSB0"  # Change this to your COM port
-port2 = "/dev/ttyUSB1"  # Change this to your COM port
+#csv_filename ="~/your_git_repo_name/tactilerobot/sm_events.csv"
+csv_filename = os.path.join(os.getcwd(), "./tactilerobot/tactile_events.csv")
+
+# Serial configuration (can change if Linux or Mac)
+# the port can change for each reconnexion.
+port1 = "/dev/ttyUSB0"  # Change this to your COM ports
+port2 = "/dev/ttyUSB1"  # Change this to your COM ports
 
 baud_rate = 250000
 display = 1
@@ -60,7 +63,6 @@ def init_skin():
 def get_raw_data():
     #ser.write(b'data\n')  # Send command to request raw data
     data = ser.readline().decode().strip()
-    print("\r",data.split('.'))
     return data.split(',')  # Split the received data by comma
 
 def get_touch_position(values_2d):
@@ -115,7 +117,7 @@ try:
         csv_writer = csv.writer(csv_file)
 
         # Write the header row
-        csv_writer.writerow(['Computer Time','Time', 'Touched ID','S'])
+        csv_writer.writerow(['Computer Time (ms)', 'touch_row','touch_col','type'])
         while True:
             # Read data until '\r\n'
             #raw_data = ser.readline().decode().strip()
@@ -143,8 +145,11 @@ try:
 
                         print("mean_data: ", data_mean,"\n")
                         flag=False
-
+                        # start the timer
+                        starting_time_ms = int(datetime.now().timestamp() * 1e3)
                         print('\rEnd Calibration\n')
+
+
                     abs_diff = -np.subtract(values,data_mean)/5
                     abs_diff[abs_diff<0]=0
                     below_threshold_indices = np.where(abs_diff < threshold)[0]
@@ -166,12 +171,10 @@ try:
                     xy = index2cart(touch_2d)
                     if xy:
                         print("\rTouched position:", xy, "cm\n")
-                        current_time_micros = int(datetime.now().timestamp() * 1e6)
-                        csv_writer.writerow([current_time_micros,time, touch_2d, 2])
+                        current_time_ms = int(datetime.now().timestamp() * 1e3)
+                        csv_writer.writerow([current_time_ms-starting_time_ms, touch_2d[0], touch_2d[1], 2])
                     #values_2d[values_2d >= threshold] = 255  # Apply thresholding
 
-                    # Filter the values using Butterworth filter
-                    #print(derivative_values)
                     # Display the image using OpenCV
                     if display:
                         resized = cv2.resize(values_2d, dim, interpolation=cv2.INTER_AREA)
