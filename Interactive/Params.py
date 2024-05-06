@@ -17,10 +17,10 @@ tau_stp = 1000 * ms                 # Short-term Plasticity Time constant
 
 K_GABA = 10                         # GABA currnets' multiplier
 K_Mod = 3 /mV*ms                    # Modulation currnets' multiplier
-K_Tac = 30 * mV/ms                  # Tactile Input currnets' multiplier
+K_Tac = 20 * mV/ms                  # Tactile Input currnets' multiplier
 K_Prop = 30 * mV/ms                 # Proprioceptive Input currnets' multiplier
 
-K_AMPA = 50                         # AMPA currnets' multiplier
+K_AMPA = 252                        # AMPA currnets' multiplier
 K_AG = 1                            # GABA and AMPA currnets' multiplier
 
 

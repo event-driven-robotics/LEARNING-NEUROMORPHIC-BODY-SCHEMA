@@ -116,7 +116,7 @@ Syn_eq1 =    '''
              dw_stp/dt = -(w_stp/tau_stp)       : 1 (event-driven)
              '''
 EX_on_pre_eq =  '''
-                Ia1 += w / (1+w_stp)
+                Ia1 += w 
                 apre += Apre
                 w = clip(w+(L_Rate*apost)*volt/second, wmin, wmax)
                 '''
@@ -127,6 +127,6 @@ EX_on_post_eq = '''
                 '''
 
 
-
+# / (1+w_stp)
             #  dw/dt = -w/(1000*second) : volt/second
             # w_stp += 1

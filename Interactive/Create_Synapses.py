@@ -45,12 +45,12 @@ def Load_Synapses(Prop_Neurons_1, Prop_Neurons_2, Prop_Neurons_T1, Prop_Neurons_
     GF_Tactile = Synapses(GF_Neurons, Tactile_Neurons, Syn_eq1 , on_pre=EX_on_pre_eq, on_post=EX_on_post_eq, method='euler', delay=0 * ms)
     GF_Tactile.connect()
     GF_Tactile.w = 0 * mV / ms
-    SynapseDir = './Trained_Weights/'
+    SynapseDir = './Interactive/Trained_Weights/'
     Syn_Name = 'GF_Tactile'
     Syn_Suff = '_TR1_24_11_epoch400'
     W = np.load(SynapseDir+Syn_Name+Syn_Suff+'.npy')
-    W = np.interp(W, [0, max(W)], [0, 30])
-    GF_Tactile.w =  W * mV / ms
+    W = np.interp(W, [0, max(W)], [0, 160])
+    GF_Tactile.w =  W * mV / ms 
     GF_Tactile.w_stp = 0
 
     ###########################
@@ -58,14 +58,16 @@ def Load_Synapses(Prop_Neurons_1, Prop_Neurons_2, Prop_Neurons_T1, Prop_Neurons_
     for_pre_ind = GF_Tactile.i
     for_post_ind = GF_Tactile.j
     for_weight = GF_Tactile.w
-    for_weight = np.interp(for_weight, [0, max(for_weight)], [0, 30])
+    # for_weight = np.interp(for_weight, [0, max(for_weight)], [0, 15])
 
     Tactile_GF = Synapses(Tactile_Neurons, GF_Neurons, ''' w : volt/second''' , on_pre='''Ia1 +=w''',  method='euler', delay=0 * ms)
     Tactile_GF.connect()
 
     for k in range(len(for_pre_ind)):
-        Tactile_GF.w[for_post_ind[k], for_pre_ind[k]] = for_weight[k]*mV/ms
+        Tactile_GF.w[for_post_ind[k], for_pre_ind[k]] = for_weight[k]
     # Tactile_GF.w_stp = 0
+    
+    GF_Tactile.w =  0 * mV / ms
         
     ###########################
     # Create Propriception to Motor_Gain-Field_1 Synapses 
@@ -108,20 +110,20 @@ def Load_Synapses(Prop_Neurons_1, Prop_Neurons_2, Prop_Neurons_T1, Prop_Neurons_
     ###########################
     # Create GF Inhibitory Synapses 
     GF_GF_Inh = Synapses(GF_Neurons, GF_Neurons, ''' w : volt/second''', on_pre='''Ig1 -=w''', method='euler', delay=2 * ms)
-    GF_GF_Inh.connect(condition='i!=j')
-    GF_GF_Inh.w = 15 * mV / ms
-    # GF_GF_Inh.connect(condition='sqrt((X_pre-X_post)**2+(Y_pre-Y_post)**2)>3')
-    # GF_GF_Inh.w = '(200 * exp(-(sqrt((X_pre-X_post)**2+(Y_pre-Y_post)**2)-10)**2/3)) * mV / ms'
+    # GF_GF_Inh.connect(condition='i!=j')
+    # GF_GF_Inh.w = 100 * mV / ms
+    GF_GF_Inh.connect(condition='sqrt((X_pre-X_post)**2+(Y_pre-Y_post)**2)>3')
+    GF_GF_Inh.w = '(400 * exp(-(sqrt((X_pre-X_post)**2+(Y_pre-Y_post)**2)-10)**2/7)) * mV / ms'
     GF_GF_Inh.w = 0 * mV / ms
     ###########################
 
     ###########################
     # Create GF Inhibitory Synapses 
     GF_GF_Ex = Synapses(GF_Neurons, GF_Neurons, ''' w : volt/second''', on_pre='''Ia1 +=w''', method='euler', delay=2 * ms)
-    # GF_GF_Ex.connect(condition='i==j')
-    # GF_GF_Ex.w = 20 * mV / ms
-    GF_GF_Ex.connect()
-    GF_GF_Ex.w = '10 * exp(-(sqrt((X_pre-X_post)**2+(Y_pre-Y_post)**2))/1) * mV / ms'
+    GF_GF_Ex.connect(condition='i==j')
+    GF_GF_Ex.w = 0.01 * mV / ms
+    # GF_GF_Ex.connect()
+    # GF_GF_Ex.w = '10 * exp(-(sqrt((X_pre-X_post)**2+(Y_pre-Y_post)**2))/1) * mV / ms'
     GF_GF_Ex.w = 0 * mV / ms
     ###########################
 
