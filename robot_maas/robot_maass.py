@@ -51,11 +51,11 @@ N = 10 #buffer size for filtering
 threshold_buffer = [[] for _ in range(252)] # Initialize a buffer to store values below the threshold
 #################### EXPERIMENTATION PARAMETERS #################################
 znotouch=-80
-ztouch=-84
+ztouch=-85
 z=ztouch
 INITIAL_POSITION = [60,250,ztouch]
 SCALING = 20 #scaling from action to euclidean position
-ROBOT_SPEED = 30000
+ROBOT_SPEED = 20000
 
 ACTION_SPACE=[[0,1],[1,0],[0,-1],[-1,0]]
 
@@ -370,6 +370,10 @@ for n in range(1000):
     isTouch, values1d, values2d, data_mean, threshold_buffer = get_tactile(values,threshold_buffer)
     values_2d=np.reshape(values1d, (21, 12)).astype(np.uint8).T
     max_index_flat = np.argmax(values_2d)
+    if display:
+        resized = cv2.resize(values_2d, dim, interpolation=cv2.INTER_AREA)
+        cv2.imshow('Skin Patch', cv2.applyColorMap(resized, cv2.COLORMAP_VIRIDIS))
+    cv2.waitKey(1)
     o_next = torch.tensor(index_touch_2d).float() #get next observation
     index_touch_2d = np.unravel_index(max_index_flat, values2d.shape)
     # move up
