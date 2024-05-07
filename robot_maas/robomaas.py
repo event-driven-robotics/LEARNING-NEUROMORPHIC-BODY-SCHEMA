@@ -57,35 +57,37 @@ class Agent(nn.Module):
 
         return action_idx # TODO: chenge where method is called
     
-norm=False
-model = Agent(o_size=2, a_size=8, s_dim=1000)
-device = 'cpu'
-loss_record = []
+if __name__ == '__main__':
 
-plt.figure()
+    norm=False
+    model = Agent(o_size=2, a_size=8, s_dim=1000)
+    device = 'cpu'
+    loss_record = []
 
-while True:
-    # training step
-    with torch.no_grad():
-        o_pre = torch.tensor([14., 72.])
-        action = 0
-        o_next = torch.tensor([14., 72.])
+    plt.figure()
 
-        identity = torch.eye(model.a_size).to(device)
-        state_diff = model.Q@o_next-model.Q@o_pre
-        prediction_error = state_diff - model.V[:,action]
-        desired = identity[action].T # TODO: maybe remove?
-        
-        # Core learning rules:
-        print(model.Q.shape, prediction_error.shape, o_next.shape, torch.outer(prediction_error, o_next).shape)
-        model.Q += -0.1 * torch.outer(prediction_error, o_next)#TODO:o.T?
-        model.V[:,action] += 0.01 * prediction_error
-        if norm:
-            model.V.data = model.V / torch.norm(model.V, dim=0)
+    while True:
+        # training step
+        with torch.no_grad():
+            o_pre = torch.tensor([14., 72.])
+            action = 0
+            o_next = torch.tensor([14., 72.])
 
-        loss = nn.MSELoss()(prediction_error, torch.zeros_like(prediction_error))
-        loss_record.append(loss.cpu().item())
-        
-        plt.plot(loss_record)
-        plt.pause(0.001)
-        plt.draw()
+            identity = torch.eye(model.a_size).to(device)
+            state_diff = model.Q@o_next-model.Q@o_pre
+            prediction_error = state_diff - model.V[:,action]
+            desired = identity[action].T # TODO: maybe remove?
+
+            # Core learning rules:
+            print(model.Q.shape, prediction_error.shape, o_next.shape, torch.outer(prediction_error, o_next).shape)
+            model.Q += -0.1 * torch.outer(prediction_error, o_next)#TODO:o.T?
+            model.V[:,action] += 0.01 * prediction_error
+            if norm:
+                model.V.data = model.V / torch.norm(model.V, dim=0)
+
+            loss = nn.MSELoss()(prediction_error, torch.zeros_like(prediction_error))
+            loss_record.append(loss.cpu().item())
+
+            plt.plot(loss_record)
+            plt.pause(0.001)
+            plt.draw()

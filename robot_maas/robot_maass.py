@@ -2,6 +2,8 @@ import sys
 import os
 import math
 import serial
+import torch
+import torch.nn as nn
 pi=math.pi
 import random #for generating random angles
 # Append the parent directory to sys.path
@@ -14,6 +16,13 @@ import matplotlib.pyplot as plt
 
 import csv
 from datetime import datetime
+
+## import the maas agent
+
+from robomaas import Agent
+# file name where you want the data to be stored
+csv_filename = os.path.join(os.getcwd(), "tactile_events_robot.csv")
+## display
 display=1
 if display:
     import cv2
@@ -23,9 +32,6 @@ if display:
     width = int(img.shape[1] * scale_percent / 100)
     height = int(img.shape[0] * scale_percent / 100)
     dim = (width, height)
-# file name where you want the data to be stored
-csv_filename = os.path.join(os.getcwd(), "tool_l2plus20mm.csv")
-
 #################### ROBOT ############################################################
 try:
     dexarm = Dexarm(port="/dev/ttyACM0")
@@ -40,31 +46,23 @@ port2 = "/dev/ttyUSB1"  # Change this to your COM ports
 
 baud_rate = 250000
 calibration_time = .5  # seconds
-threshold = 100 # threshold for detecting tactile events
-N = 5 #buffer size for filtering
+threshold = 20*4#20*5 # threshold for detecting tactile events
+N = 10 #buffer size for filtering
 threshold_buffer = [[] for _ in range(252)] # Initialize a buffer to store values below the threshold
 #################### EXPERIMENTATION PARAMETERS #################################
-ARM_LENGTHS=[200,220]
-ROBOT_ORIGIN = [0,0]
-#ANGLE_STEP=math.pi/32
-ANGLE_STEP=math.pi/32
-ROBOT_SPEED = 10000
-MAX_ANGLE1=math.pi/2
-MAX_ANGLE2=math.pi
-MIN_ANGLE1=-math.pi/2
-MIN_ANGLE2=-math.pi
-INIT_JOINT_ANGLES=[-math.pi/4,math.pi/4]
-#theta=[0,0]
-#dexarm.move_to(*current_position, feedrate=4000, mode="G1")
-N_exploration = 1000
-###################### DEFINE WORKING SPACE ##################################
 znotouch=-80
-z=-85
-ztouch=-85
+ztouch=-84
+z=ztouch
+INITIAL_POSITION = [60,250,ztouch]
+SCALING = 20 #scaling from action to euclidean position
+ROBOT_SPEED = 30000
 
-# corner1=[-40,283,z]
-# corner2=[179,215,z]
-# corner3=[206,298,z]
+ACTION_SPACE=[[0,1],[1,0],[0,-1],[-1,0]]
+
+N_exploration = 10000
+###################### DEFINE WORKING SPACE ##################################
+
+
 corner1=[-20,280,z]
 corner2=[179,215,z]
 corner3=[206,298,z]
@@ -110,6 +108,7 @@ def init_skin():
 
 def get_raw_data():
     #ser.write(b'data\n')  # Send command to request raw data
+    ser.reset_input_buffer()
     data = ser.readline().decode().strip()
     cnt=0
     while True:
@@ -227,6 +226,29 @@ def move_to_next_angle(theta,action,corners):
 
     [end_effector_x, end_effector_y, elbow_x, elbow_y] = forward_kinematics_2d(theta)
     return end_effector_x, end_effector_y, theta, elbow_x, elbow_y
+def sample_point_on_skin(corners):
+# Define number of points along each axis
+    num_points_x = 21
+    num_points_y = 11
+
+    # Define axis vectors
+    axis_x = np.subtract(corners[1],corners[0])
+    axis_y = np.subtract(corners[2], corners[1])
+
+    # Generate grid of points
+    waypoints = []
+    for i in range(num_points_x):
+
+
+        for j in range(num_points_y):
+            # Calculate coordinates of each point
+            x_coord = i / (num_points_x - 1) * axis_x
+            y_coord = j / (num_points_y - 1) * axis_y
+            # Append the point to the list of waypoints
+            waypoints.append(corners[0]+x_coord+y_coord)
+    random_index = np.random.randint(0, len(waypoints))
+    target_3d = waypoints[random_index][:]
+    return target_3d
 ###### UTILS
 def point_inside_corners(x, y, corners):
     n = len(corners)
@@ -294,6 +316,7 @@ def closest_point_on_polygon_border(p, corners):
             closest_point = closest
 
     return closest_point, min_distance
+##### AGENT FUNCTION
 
 
 # first init skin
@@ -301,216 +324,83 @@ ser,port=init_skin()
 data_mean, threshold_buffer = calibrate_skin()
 ## INIT ROBOT
 dexarm.go_home()
-# init
-# simulation
-simu_points=[];
 
-with open(csv_filename, mode='w', newline='') as csv_file:
-    csv_writer = csv.writer(csv_file)
-    # write Header row
-    csv_writer.writerow(['Time','actionAngle1','actionAngle2','jointAngle1','jointAngle2','pos_x','pos_y','touch_id_row','touch_id_col','touch'])
-    #starting time
-    start_time_ms = int(datetime.now().timestamp() * 1e3)
-    #launch exploration
-    theta = INIT_JOINT_ANGLES[:] #init posture
-    a=np.zeros(len(ARM_LENGTHS),)
-    #where am I?
-    [target_x, target_y, new_theta, elbow_x, elbow_y]=move_to_next_angle(theta,a,corners)
-    #inside the box?
-    inside = point_inside_corners(target_x, target_y, corners)
-    closest_point, distance_to_border = closest_point_on_polygon_border([target_x,target_y], corners)
+# init agent
+norm=False
+model = Agent(o_size=2, a_size=4, s_dim=1000)
+device = 'cpu'
+loss_record = []
 
-    print("Closest point on the border:", closest_point)
-    print("Distance to the border:", distance_to_border)
-    #get tactile data
-    if inside:
-        target_3d=[target_x,target_y,ztouch]
-        values=get_raw_data()
-        isTouch, values1d, values2d, data_mean, threshold_buffer = get_tactile(values,threshold_buffer)
-        max_index_flat = np.argmax(values2d)
-        index_touch_2d = np.unravel_index(max_index_flat, values2d.shape)
-        current_time_ms = -start_time_ms+int(datetime.now().timestamp() * 1e3)
-        csv_row = [current_time_ms,a[0],a[1], theta[0], theta[1], target_x, target_y,index_touch_2d[0],index_touch_2d[1]]
-        val=np.reshape(values1d, (21, 12)).astype(np.uint8).T
-        csv_row.extend(np.ravel(val))
-        csv_writer.writerow(csv_row)
-    else:
-        target_3d=[closest_point[0],closest_point[1],znotouch]
-        values=np.zeros(252,)
-        values2d=np.reshape(values, (21, 12)).astype(np.uint8).T
-        index_touch_2d=[-1,-1]
-    #compute tactile activations
+target_position= INITIAL_POSITION[:]
 
-    # write data
-    #init
-    for i in range(10):
-        values=get_raw_data()
-        isTouch, values1d, values2d, data_mean, threshold_buffer = get_tactile(values,threshold_buffer)
-
-    for i in range(N_exploration):
-        # take a random action (joint angle change)
-        a=random_action()
-        # get the target position/posture inside the corner space
-        [target_x, target_y, theta, elbow_x, elbow_y]=move_to_next_angle(theta,a,corners)
-        # check if point inside corners
-        inside = point_inside_corners(target_x, target_y, corners)
-        if not(inside):
-            target_3d[-1]=znotouch
-            dexarm.move_to(*target_3d, feedrate=ROBOT_SPEED, mode="G1", wait=True) #move up
-            # if not, find another action
-            while not(inside):
-                #store data
-                if True: #artificial data notouch
-                    #get_raw_data() #to update the sensor?
-                    values=np.zeros(252,)
-                    values2d=np.reshape(values, (21, 12)).astype(np.uint8).T
-                    index_touch_2d=[-1,-1]
-                else:  #real data but slow
-                    values=get_raw_data()
-                    isTouch, values1d, values2d, data_mean, threshold_buffer = get_tactile(values,threshold_buffer)
-                    max_index_flat = np.argmax(values2d)
-                    index_touch_2d = np.unravel_index(max_index_flat, values2d.shape)
-                #
-                if False:
-                    current_time_ms = -start_time_ms+int(datetime.now().timestamp() * 1e3)
-                    csv_row = [current_time_ms,a[0],a[1], theta[0], theta[1], target_x, target_y,index_touch_2d[0],index_touch_2d[1]]
-                    csv_row.extend(np.ravel(values1d))
-                    csv_writer.writerow(csv_row)
-                # check closest point projected in the corners
-                closest_point, distance_to_border = closest_point_on_polygon_border([target_x,target_y], corners)
-                #target_3d=[closest_point[0],closest_point[1],-80]
-                #dexarm.move_to(*target_3d, feedrate=ROBOT_SPEED, mode="G1", wait=True)
-
-                #print("Closest point on the border:", closest_point)
-                #print("Distance to the border:", distance_to_border)
-
-                #continue moving
-                a=random_action()
-                #print("oubound",theta,a, target_x, target_y)
-                [target_x, target_y, theta, elbow_x, elbow_y]=move_to_next_angle(theta,a,corners)
-                inside = point_inside_corners(target_x, target_y, corners)
-
-        #variable with targets, elbows position and if inside
-        simu_points.append([target_x,target_y,elbow_x,elbow_y,inside])
-
-        #move the robot
-        target_3d = [target_x,target_y,ztouch]
-        #ser.reset_input_buffer()
-        #values=get_raw_data()
-        dexarm.move_to(*target_3d, feedrate=ROBOT_SPEED, mode="G1", wait=True)
-        ser.reset_input_buffer()
-        dexarm.dealy_ms(1)
-        values=get_raw_data()
-        isTouch, values1d, values2d, data_mean, threshold_buffer = get_tactile(values,threshold_buffer)
-        # Find the indices of the maximum value in the flattened array
-        values_2d = np.reshape(values1d, (21, 12)).astype(np.uint8).T
-        max_index_flat = np.argmax(values_2d)
-        index_touch_2d = np.unravel_index(max_index_flat, values2d.shape)
-
-        if display:
-            resized = cv2.resize(values_2d, dim, interpolation=cv2.INTER_AREA)
-            cv2.imshow('Skin Patch', cv2.applyColorMap(resized, cv2.COLORMAP_VIRIDIS))
-            cv2.waitKey(1)
-        current_time_ms = -start_time_ms+int(datetime.now().timestamp() * 1e3)
-        print(np.reshape(values1d, (21, 12)).astype(np.uint8).T)
-
-        #write data
-        csv_row = [current_time_ms,a[0],a[1], theta[0], theta[1], target_x, target_y,index_touch_2d[0],index_touch_2d[1]]
-        val=np.reshape(values1d, (21, 12)).astype(np.uint8).T
-        csv_row.extend(np.ravel(val))
-        csv_writer.writerow(csv_row)
-
-        #theta = new_theta
-
-    # Plot the positions of the upper arm and forearm
-
-        print("Step",i,"going to ", target_3d, "angle: ", theta, "action:", a)
-    # move the robot
-    #dexarm.move_to(*target_3d, feedrate=ROBOT_SPEED, mode="G1")
-    # get computer time for sync with touch.
-        # write data
-dexarm.go_home()
-print(simu_points)
-#real
-if False:
-    theta=[0,0]
-    for i in range(N_exploration):
-        a=random_action()
-        print("next angle",a)
-
-        [target_x, target_y, elbow_x, elbow_y]=move_to_next_angle(theta,a,corners)
-
-        inside = point_inside_corners(target_x, target_y)
-        if inside:
-            target_3d = [target_x,target_y,z]
-            theta = np.add(theta, a)
-        else:
-            print("outbound:",[target_x,target_y])
-
-        print("going to ", target_3d, "angle: ", theta)
-        # move the robot
-        dexarm.move_to(*target_3d, feedrate=ROBOT_SPEED, mode="G1")
-        # get computer time for sync with touch.
-            # write data
-
-# Separate points based on the true/false flag
-true_points = [point[:4] for point in simu_points if point[4] is True]
-false_points = [point[:4] for point in simu_points if point[4] is False]
-
-# Extract x and y coordinates
-true_x = [point[0] for point in true_points]
-true_y = [point[1] for point in true_points]
-false_x = [point[0] for point in false_points]
-false_y = [point[1] for point in false_points]
-
-plt.ion()
 plt.figure()
-# Plot the points with different colors
-for point in simu_points:
-    # Extract coordinates for each line
-    x_values = [ROBOT_ORIGIN[0], point[2], point[0]]
-    y_values = [ROBOT_ORIGIN[1], point[3], point[1]]
+for n in range(1000):
 
-    # Plot the line
-    plt.plot(x_values, y_values, color='green')
-# plot endpoints
-plt.scatter(true_x, true_y, color='blue', label='True')
-plt.scatter(false_x, false_y, color='red', label='False')
-# plot elbows
-plt.scatter([points[2] for points in simu_points], [points[3] for points in simu_points], color='black')
-# plt.plot([[ROBOT_ORIGIN[0], point[0], point[2]] for point in simu_points], [[ROBOT_ORIGIN[1], point[1], point[3]] for point in simu_points], color='green')
-# plt.plot([[ROBOT_ORIGIN[0], point[0], point[2]] for point in simu_points], [[ROBOT_ORIGIN[1], point[1], point[3]] for point in simu_points], color='green')
-# Add labels and legend
-plt.xlabel('X')
-plt.ylabel('Y')
-plt.title('Trajectory')
-plt.legend()
+    target_position = sample_point_on_skin(corners) #sample position on skin
 
-# Show plot
-plt.grid(True)
-plt.axis('equal')
-plt.pause(100)
-# Add labels and legend
-plt.xlabel('X')
-plt.ylabel('Y')
-plt.title('Trajectory')
-plt.legend()
+    dexarm.move_to(*target_position,feedrate=ROBOT_SPEED,mode='G1', wait=True) #move robot
+    dexarm.dealy_ms(20)
+    #get touched position indexes
+    values=get_raw_data()
+    isTouch, values1d, values2d, data_mean, threshold_buffer = get_tactile(values,threshold_buffer)
+    values_2d=np.reshape(values1d, (21, 12)).astype(np.uint8).T
+    max_index_flat = np.argmax(values_2d)
+    index_touch_2d = np.unravel_index(max_index_flat, values2d.shape)
 
-# Show plot
-plt.grid(True)
-plt.axis('equal')
-plt.show()
+    o_pre = torch.tensor(index_touch_2d).float() #get observation
+    print('O_pre debug' , o_pre.shape)
 
-# Convert list of waypoints to numpy array
-print(waypoints)
-#dexarm.move_to(*current_position, feedrate=4000, mode="G1")
-print(dexarm.get_current_position())
-    # Define initial position
-    # for i in range(-300,300,50):
-    #     print("X",i)
-    #     for j in range(0,500,20):
-    #         current_position = [i, j, -84]
-    #         print("Y",j)
-    #         dexarm.move_to(*current_position, feedrate=4000, mode="G1")
+    #target_position[-1]=znotouch
+    #dexarm.move_to(*target_position,feedrate=ROBOT_SPEED,mode='G1', wait=True)
+    print('Exploration step:', n, 'touch id',index_touch_2d)
+    #sample an action
+    inside=False
+    while not inside:
+        action = np.random.randint(0, len(ACTION_SPACE))
+        action_performed = ACTION_SPACE[action]
+        inside = point_inside_corners(target_position[0]+SCALING*action_performed[0], target_position[1]+SCALING*action_performed[1], corners)
 
-    #dexarm.go_home()
+    target_position[:2] = target_position[:2] + SCALING*np.array(action_performed)
+    target_position[-1] = ztouch
+
+    print("choosen action:", action_performed)
+    dexarm.move_to(*target_position,feedrate=ROBOT_SPEED,mode='G1', wait=True)
+    dexarm.dealy_ms(20)
+    values=get_raw_data()
+    isTouch, values1d, values2d, data_mean, threshold_buffer = get_tactile(values,threshold_buffer)
+    values_2d=np.reshape(values1d, (21, 12)).astype(np.uint8).T
+    max_index_flat = np.argmax(values_2d)
+    o_next = torch.tensor(index_touch_2d).float() #get next observation
+    index_touch_2d = np.unravel_index(max_index_flat, values2d.shape)
+    # move up
+    #target_position[-1]=znotouch
+    #dexarm.move_to(*target_position,feedrate=ROBOT_SPEED,mode='G1', wait=True)
+
+    print('Exploration step:', n, 'touch id',index_touch_2d)
+    # compute the loss
+    with torch.no_grad():
+        identity = torch.eye(model.a_size).to(device)
+        state_diff = model.Q@o_next-model.Q@o_pre
+        prediction_error = state_diff - model.V[:,action]
+        desired = identity[action].T # TODO: maybe remove?
+
+        # Core learning rules:
+        model.Q += -0.1 * torch.outer(prediction_error, o_next)#TODO:o.T?
+        model.V[:,action] += 0.01 * prediction_error
+        if norm:
+            model.V.data = model.V / torch.norm(model.V, dim=0)
+
+        loss = nn.MSELoss()(prediction_error, torch.zeros_like(prediction_error))
+        loss_record.append(loss.cpu().item())
+
+    plt.plot(loss_record, c='r')
+    plt.pause(0.001)
+    plt.draw()
+
+
+torch.save(model.state_dict(), './checkpoint')
+
+# model = TheModelClass(*args, **kwargs)
+# model.load_state_dict(torch.load(PATH))
+# model.eval()
+

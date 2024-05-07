@@ -24,9 +24,6 @@ ztouch=-82
 corner1=[-40,283,z]
 corner2=[179,215,z]
 corner3=[206,298,z]
-corner1=[-20,280,z]
-corner2=[179,215,z]
-corner3=[206,298,z]
 #corner4=[-3,374,z]
 
 
