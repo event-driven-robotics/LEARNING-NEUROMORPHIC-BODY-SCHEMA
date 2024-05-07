@@ -1,0 +1,3 @@
+[submodule "Cognitive-Map-Learner"]
+	path = Cognitive-Map-Learner
+	url = https://github.com/IGITUGraz/Cognitive-Map-Learner.git
