@@ -15,7 +15,8 @@ import csv
 from datetime import datetime, timedelta  # Import datetime module for getting the current time
 
 #csv_filename ="~/your_git_repo_name/tactilerobot/sm_events.csv"
-csv_filename = os.path.join(os.getcwd(), "./tactilerobot/tactile_events.csv")
+#csv_filename = os.path.join(os.getcwd(), "./tactilerobot/tactile_events.csv")
+csv_filename = os.path.join(os.getcwd(), "tactile_events_skin.csv")
 
 # Serial configuration (can change if Linux or Mac)
 # the port can change for each reconnexion.
@@ -31,7 +32,7 @@ calibration_time = .5  # seconds
 threshold = 20 # threshold for detecting tactile events
 
 # Define the size of the buffer
-N = 10
+N = 5
 # Initialize a buffer to store values below the threshold
 threshold_buffer = [[] for _ in range(252)]
 

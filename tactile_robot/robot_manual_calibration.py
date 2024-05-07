@@ -1,9 +1,9 @@
 import sys
+import os
 # Append the parent directory to sys.path
-sys.path.append('/home/abdelnasser/Git_projects/tactilerobot/')
-
-# Now you can import Dexarm from pydexarm
-from DexArm_API.pydexarm import Dexarm
+parent_dir = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
+sys.path.append(parent_dir+"/DexArm_API")
+from pydexarm.pydexarm import Dexarm
 import numpy as np
 '''windows'''
 #dexarm = Dexarm(port="ttyACM0")
@@ -22,6 +22,9 @@ z=-80
 ztouch=-82
 
 corner1=[-40,283,z]
+corner2=[179,215,z]
+corner3=[206,298,z]
+corner1=[-20,280,z]
 corner2=[179,215,z]
 corner3=[206,298,z]
 #corner4=[-3,374,z]
