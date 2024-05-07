@@ -1,6 +1,8 @@
 import sys
-sys.path.append('/home/abdelnasser/Git_projects/tactilerobot/')
-from DexArm_API.pydexarm import Dexarm
+import os
+parent_dir = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
+sys.path.append(parent_dir+"/DexArm_API")
+from pydexarm.pydexarm import Dexarm
 
 import serial
 import numpy as np
@@ -12,7 +14,6 @@ import curses  # Import the keyboard module
 import select  # Import the select module
 import sys
 import fcntl
-import os
 display = 0
 if display:
     import cv2

@@ -1,0 +1,33 @@
+calibration_time = .5  # seconds
+threshold = 20*5 # threshold for detecting tactile events
+N = 10 #buffer size for filtering
+threshold_buffer = [[] for _ in range(252)] # Initialize a buffer to store values below the threshold
+#################### EXPERIMENTATION PARAMETERS #################################
+ARM_LENGTHS=[200,200]
+ROBOT_ORIGIN = [0,0]
+ANGLE_STEP=math.pi/32
+ROBOT_SPEED = 10000
+MAX_ANGLE1=math.pi/2
+MAX_ANGLE2=math.pi
+MIN_ANGLE1=-math.pi/2
+MIN_ANGLE2=-math.pi
+INIT_JOINT_ANGLES=[-math.pi/4,math.pi/4]
+#theta=[0,0]
+#dexarm.move_to(*current_position, feedrate=4000, mode="G1")
+N_exploration = 5000
+###################### DEFINE WORKING SPACE ##################################
+znotouch=-80
+z=-85
+ztouch=-85
+
+corner1=[-40,283,z]
+corner2=[179,215,z]
+corner3=[206,298,z]
+# Define number of points along each axis
+num_points_x = 21
+num_points_y = 11
+# Define axis vectors
+axis_x = np.subtract(corner2,corner1)
+axis_y = np.subtract(corner3, corner2)
+
+corner4=corner1 + axis_y

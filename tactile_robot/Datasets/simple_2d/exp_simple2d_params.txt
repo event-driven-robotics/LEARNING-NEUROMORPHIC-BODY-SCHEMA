@@ -1,0 +1,20 @@
+### robot parameters
+ARM_LENGTHS=[200,200]
+ROBOT_ORIGIN = [0,0]
+ANGLE_STEP=math.pi/16
+ROBOT_SPEED = 5000
+MAX_ANGLE1=math.pi/2
+MAX_ANGLE2=math.pi
+MIN_ANGLE1=-math.pi/2
+MIN_ANGLE2=-math.pi
+
+# init angles
+theta=[-math.pi/4,math.pi/4]
+
+### corners
+z=-85
+ztouch=-85
+
+corner1=[-40,283,z]
+corner2=[179,215,z]
+corner3=[206,298,z]

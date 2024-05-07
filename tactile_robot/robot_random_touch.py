@@ -1,7 +1,10 @@
 import sys
+import os
 # Append the parent directory to sys.path
-sys.path.append('/home/abdelnasser/Git_projects/tactilerobot/')
-from DexArm_API.pydexarm import Dexarm
+parent_dir = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
+sys.path.append(parent_dir+"/DexArm_API")
+from pydexarm.pydexarm import Dexarm
+
 import numpy as np
 import csv
 from datetime import datetime
@@ -23,7 +26,7 @@ dexarm.go_home()
 #current_position=[0,240,-84]
 #dexarm.move_to(*current_position, feedrate=4000, mode="G1")
 N_exploration = 500
-csv_filename = "/home/abdelnasser/Git_projects/tactilerobot/DexArm_API/pydexarm/sm_events.csv"
+csv_filename = os.path.join(os.getcwd(),"sm_events.csv")
 ###
 z=-80
 ztouch=-85
