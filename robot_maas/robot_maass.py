@@ -21,7 +21,7 @@ from datetime import datetime
 
 from robomaas import Agent
 # file name where you want the data to be stored
-name="exploration_may8_1523"
+name="exploration_may8_1603"
 #csv_filename = os.path.join(os.getcwd(), "exploration_may8_1505.csv")
 csv_filename = f"{os.getcwd()}/{name}.csv"
 
@@ -74,6 +74,10 @@ corner3=[206,298,z]
 corner1=[-20,280,z]
 corner2=[179,215,z]
 corner3=[206,298,z]
+
+corner1=[20,270,z]
+corner2=[119,245,z]
+corner3=[130,308,z]
 
 # Define number of points along each axis
 num_points_x = 21
