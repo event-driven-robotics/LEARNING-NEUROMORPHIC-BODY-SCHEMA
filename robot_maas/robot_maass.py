@@ -21,7 +21,9 @@ from datetime import datetime
 
 from robomaas import Agent
 # file name where you want the data to be stored
-csv_filename = os.path.join(os.getcwd(), "exploration_may8_1505.csv")
+name="exploration_may8_1523"
+#csv_filename = os.path.join(os.getcwd(), "exploration_may8_1505.csv")
+csv_filename = f"{os.getcwd()}/{name}.csv"
 
 ## display
 display=1
@@ -57,7 +59,7 @@ znotouch=-80
 ztouch=-86
 z=ztouch
 INITIAL_POSITION = [60,250,ztouch]
-SCALING = 30 #scaling from action to euclidean position
+SCALING = 10 #scaling from action to euclidean position
 ROBOT_SPEED = 20000
 
 ACTION_SPACE=[[0,1],[1,0],[0,-1],[-1,0]]
@@ -133,7 +135,7 @@ def get_raw_data():
             break
         else:
             values=None
-            print('Wrong data size:',cnt+1)
+            #print('Wrong data size:',cnt+1)
             data = ser.readline().decode().strip()
             cnt+=1
             if cnt>10:
@@ -513,7 +515,7 @@ with open(csv_filename, mode='w', newline='') as csv_file:
         #target_position[-1]=znotouch
         #dexarm.move_to(*target_position,feedrate=ROBOT_SPEED,mode='G1', wait=True)
         # compute the loss
-        print('pre',vmax_pre,'next',vmax_next)
+        #print('pre',vmax_pre,'next',vmax_next)
         if vmax_pre>threshold and vmax_next>threshold:
             counter_training+=1
             with torch.no_grad():
@@ -530,13 +532,13 @@ with open(csv_filename, mode='w', newline='') as csv_file:
 
                 loss = nn.MSELoss()(prediction_error, torch.zeros_like(prediction_error))
                 loss_record.append(loss.cpu().item())
-                print("Epoch:", n",Loss: ",loss)
+                print("Epoch:", counter_training,"Loss ",loss.item())
             #plt.clf
             #plt.plot(loss_record, c='r')
         #plt.pause(0.001)
         #plt.draw()
         if counter_training%200 == 0:
-            torch.save(model.state_dict(), f'./checkpoint{counter_training}.pt')
+            torch.save(model.state_dict(), f'./checkpoint{name}{counter_training}.pt')
 
 
 

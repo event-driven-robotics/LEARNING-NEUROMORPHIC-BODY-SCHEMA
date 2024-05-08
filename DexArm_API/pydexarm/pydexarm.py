@@ -31,17 +31,14 @@ class Dexarm:
         if not wait:
             self.ser.reset_input_buffer()
             return
-        cnt=0
         while True:
             serial_str = self.ser.readline().decode("utf-8")
-            cnt+=1
-            print('cnt',cnt)
             if len(serial_str) > 0:
                 if serial_str.find("ok") > -1:
-                    print("read ok")
+                    #print("read ok")
                     break
-                else:
-                    print("read：", serial_str)
+                #else:
+                    #print("read：", serial_str)
 
     def go_home(self):
         """
