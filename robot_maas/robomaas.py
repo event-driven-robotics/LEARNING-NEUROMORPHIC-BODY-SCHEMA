@@ -41,20 +41,19 @@ class Agent(nn.Module):
         a_record has to be empty
         """
         
-        affordance_vector = torch.zeros(self.a_size, device=self.device)
-        affordance_vector[affordance] = 1
+        affordance_vector = torch.ones(self.a_size, device=self.device) * (-1e6)
+        affordance_vector[affordance] = 0
         affordance_vector_fix = affordance_vector.clone()
         not_recommended_actions = a_record
         affordance_vector_fix[not_recommended_actions] *= 0.
 
         delta = self.Q@goal-self.Q@loc
-        utility = (self.W@delta) * affordance_vector_fix
-        if torch.max(utility)!=0:
-            action_idx = torch.argmax(utility).item()
-        else:
-            utility = (self.V.T@delta) * affordance_vector
-            action_idx = torch.argmax(utility).item()
 
+        utility = (self.V.T@delta) + affordance_vector
+
+        action_idx = torch.argmax(utility).item()
+
+        print("affordance_vector",affordance_vector.detach().numpy(),"utility", utility.detach().numpy(), "action_udx", action_idx)
         return action_idx # TODO: chenge where method is called
     
 if __name__ == '__main__':
