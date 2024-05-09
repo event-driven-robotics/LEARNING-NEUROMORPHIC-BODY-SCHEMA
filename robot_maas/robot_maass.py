@@ -21,7 +21,7 @@ from datetime import datetime
 
 from robomaas import Agent
 # file name where you want the data to be stored
-name="exploration_may8_1603"
+name="final"
 #csv_filename = os.path.join(os.getcwd(), "exploration_may8_1505.csv")
 csv_filename = f"{os.getcwd()}/{name}.csv"
 
@@ -51,33 +51,34 @@ port2 = "/dev/ttyUSB1"  # Change this to your COM ports
 
 baud_rate = 250000
 calibration_time = .5  # seconds
-threshold = 80#20*5 # threshold for detecting tactile events
-N = 3 #buffer size for filtering
+threshold = 70#20*5 # threshold for detecting tactile events
+N = 5 #buffer size for filtering
+nfilt = 3 #number of filtering points
 threshold_buffer = [[] for _ in range(252)] # Initialize a buffer to store values below the threshold
 #################### EXPERIMENTATION PARAMETERS #################################
 znotouch=-80
 ztouch=-86
 z=ztouch
 INITIAL_POSITION = [60,250,ztouch]
-SCALING = 10 #scaling from action to euclidean position
+SCALING = 1/5 #scaling from action to euclidean position
 ROBOT_SPEED = 20000
 
 ACTION_SPACE=[[0,1],[1,0],[0,-1],[-1,0]]
 
-N_exploration = 2000
+N_exploration = 5000
 ###################### DEFINE WORKING SPACE ##################################
 
-corner1=[-40,283,z]
-corner2=[179,215,z]
-corner3=[206,298,z]
+# corner1=[-40,283,z]
+# corner2=[179,215,z]
+# corner3=[206,298,z]
 
 corner1=[-20,280,z]
-corner2=[179,215,z]
-corner3=[206,298,z]
+corner2=[179,220,z]
+corner3=[201,303,z]
 
-corner1=[20,270,z]
-corner2=[119,245,z]
-corner3=[130,308,z]
+# corner1=[20,270,z]
+# corner2=[119,245,z]
+# corner3=[130,308,z]
 
 # Define number of points along each axis
 num_points_x = 21
@@ -85,6 +86,8 @@ num_points_y = 11
 # Define axis vectors
 axis_x = np.subtract(corner2,corner1)
 axis_y = np.subtract(corner3, corner2)
+
+ACTION_SPACE=[axis_x[:2],-axis_x[:2],axis_y[:2],-axis_y[:2]]
 
 corner4=corner1 + axis_y
 corners = [corner1,corner2,corner3,corner4]
@@ -209,10 +212,44 @@ def get_tactile(values,buffer):
     # reshape to get the tactile image
     values_2d = np.reshape(abs_diff, (21, 12)).astype(np.uint8).T
     values_2d[:,0]=0 # to remove problems on the border
+    values_2d[:,-1]=0 # to remove problems on the border
     values_2d[values_2d < threshold] = 0  # Apply thresholding
+    values1d = values_2d.T.flatten()
 
-    return isTouch,abs_diff, values_2d, values_mean, buffer
+    # Create a 21 by 12 grid
 
+    return isTouch,values1d, values_2d, values_mean, buffer
+def pressure2touch(values1d):
+    values_2d=np.reshape(values1d, (21, 12)).astype(np.uint8).T
+    vmax_pre=np.max(values_2d)
+    max_index_flat = np.argmax(values_2d)
+    max_index_2d = np.unravel_index(max_index_flat, (12,21)) #or 12,21?
+    #print('flat',id_block(max_index_flat))
+    # touch = np.zeros(252,)
+    # touch[max_index_flat]=1
+    # o_pre = torch.tensor(touch).float() #get observation
+
+    block_id_2d=[np.maximum((max_index_2d[0]-1),0)//3,np.maximum((max_index_2d[1]-1),0)//3]
+    block_id_flat=block_id_2d[0]*7+block_id_2d[1]
+    #print('block_touch', block_touch_pre, 'touche ', touch_pre)
+    touch = np.zeros(28,)
+    touch[block_id_flat]=1
+    return block_id_flat,block_id_2d,touch
+
+def flatten_index(index_2d, shape):
+    """
+    Flatten a 2D index into a 1D index given the shape of the array.
+
+    Parameters:
+        index_2d (tuple): The 2D index in the form (row_index, column_index).
+        shape (tuple): The shape of the array in the form (num_rows, num_columns).
+
+    Returns:
+        int: The flattened index.
+    """
+    row_index, col_index = index_2d
+    num_rows, num_cols = shape
+    return row_index * num_cols + col_index
 ########## ROBOT FUNTIONS #########
 def move_robot(robot, target, wait=True):
     """
@@ -411,138 +448,131 @@ dexarm.go_home()
 
 # init agent
 norm=False
-model = Agent(o_size=252, a_size=4, s_dim=1000)
+model = Agent(o_size=28, a_size=4, s_dim=1000)
 device = 'cpu'
 loss_record = []
 
 target_position= INITIAL_POSITION[:]
 counter_training=0
+
 with open(csv_filename, mode='w', newline='') as csv_file:
     csv_writer = csv.writer(csv_file)
     # write Header row
-    csv_writer.writerow(['SampledPos_x','SampledPos_y','ObservationPre_row','ObservationPre_col','Action','ReachedPos_x','ReachedPos_y','ObservationPost_row','ObservationPost_col','discrTouch'])
+    csv_writer.writerow(['SampledPos_x','SampledPos_y','ObservationPre_LinID','ObservationPre_row','ObservationPre_col','Action','ReachedPos_x','ReachedPos_y','ObservationPost_LinID','ObservationPost_row','ObservationPost_col','discrTouch','Loss'])
     #plt.figure()
-    for n in range(N_exploration):
-
-        # if n%50 == 0:
-        #     dexarm.go_home()
-        #     data_mean, threshold_buffer = calibrate_skin()
-            ## INIT ROBOT
-
-        csv_row=[]
-        target_position = sample_point_on_skin(corners) #sample position on skin
-
-        dexarm.move_to(*target_position,feedrate=ROBOT_SPEED,mode='G1', wait=True) #move robot
-        #move_robot(dexarm,target_position,wait=True)
+    #for n in range(N_exploration):
+    n=0
+    while True:
+        target_position_pre = sample_point_on_skin(corners) #sample position on skin
+        dexarm.move_to(*target_position_pre,feedrate=ROBOT_SPEED,mode='G1', wait=True) #move robot
+        # flter and get the touch
         ser.flushInput()
-        if True:
-            values=[]
-            for i in range(5):
-                values = get_raw_data()
-                isTouch,abs_diff, values_2d, values_mean, threshold_buffer=get_tactile(values,threshold_buffer)
-                #values.append(get_raw_data())
-            #values= np.median(values, axis = 0)
-        else:
-            values = get_raw_data()
+
+        v_buff=[[] for i in range(nfilt)]
+        for i in range(nfilt):
+            v_buff[i] = get_raw_data()
+            #update buffer
+            isTouch,abs_diff, values_2d, values_mean, threshold_buffer =get_tactile(v_buff[i],threshold_buffer)
+            #compute mean
+        values=v_buff[-1]#values=np.mean(v_buff,axis=0)
 
         isTouch, values1d, values2d, data_mean, threshold_buffer = get_tactile(values,threshold_buffer)
-        values_2d=np.reshape(values1d, (21, 12)).astype(np.uint8).T
-        values_2d[:,0]=0
+        block_touch_pre,touch_pre,touch = pressure2touch(values1d)
         vmax_pre=np.max(values_2d)
-        max_index_flat = np.argmax(values_2d)
-        touch = np.zeros(252,)
-        touch[max_index_flat]=1
+
         o_pre = torch.tensor(touch).float() #get observation
-        touch_pre = np.unravel_index(max_index_flat, values2d.shape)
-        #o_pre = torch.tensor(touch_pre).float() #get observation
-
-        #data
-        csv_row.extend([target_position[0],target_position[1],touch_pre[0],touch_pre[1]])
-
-        #target_position[-1]=znotouch
-        #dexarm.move_to(*target_position,feedrate=ROBOT_SPEED,mode='G1', wait=True)
 
         if display:
             resized = cv2.resize(values2d, dim, interpolation=cv2.INTER_AREA)
             cv2.imshow('Skin Patch', cv2.applyColorMap(resized, cv2.COLORMAP_VIRIDIS))
             cv2.waitKey(1)
-        #sample an action
-        inside=False
-        while not inside:
-            action = np.random.randint(0, len(ACTION_SPACE))
-            action_performed = ACTION_SPACE[action]
-            inside = point_inside_corners(target_position[0]+SCALING*action_performed[0], target_position[1]+SCALING*action_performed[1], corners)
+        while True:
+            n+=1
 
-        target_position[:2] = target_position[:2] + SCALING*np.array(action_performed)
-        target_position[-1] = ztouch
+            #sample an action
+            inside=False
+            while not inside:
+                action = np.random.randint(0, len(ACTION_SPACE))
+                action_performed = ACTION_SPACE[action]
+                inside = point_inside_corners(target_position_pre[0]+SCALING*action_performed[0], target_position_pre[1]+SCALING*action_performed[1], corners)
 
-        dexarm.move_to(*target_position,feedrate=ROBOT_SPEED,mode='G1', wait=True) #move robot
-        #move_robot(dexarm,target_position,wait=True)
-        # cnt=0
-        # while True:
-        #     serial_str = dexarm.ser.readline().decode("utf-8")
-        #     cnt+=1
-        #     print('cnt2',cnt)
-        #     if len(serial_str) > 0:
-        #         if serial_str.find("ok") > -1:
-        #             print("mvt2 complete")
-        #             break
-        #         else:
-        #             print("read：", serial_str)
-        ser.flushInput()
-        values=[]
-        for i in range(3):
-            values = get_raw_data()
-            isTouch,abs_diff, values_2d, values_mean, threshold_buffer=get_tactile(values,threshold_buffer)
+            target_position[:2] = target_position_pre[:2] + SCALING*np.array(action_performed)
+            target_position[-1] = ztouch
 
-        isTouch, values1d, values2d, data_mean, threshold_buffer = get_tactile(values,threshold_buffer)
-        values_2d=np.reshape(values1d, (21, 12)).astype(np.uint8).T
-        values_2d[:,0]=0
-        max_index_flat = np.argmax(values_2d)
-        vmax_next=np.max(values_2d)
-        touch = np.zeros(252,)
-        touch[max_index_flat]=1
-        o_next = torch.tensor(touch).float() #get observation
+            dexarm.move_to(*target_position,feedrate=ROBOT_SPEED,mode='G1', wait=True) #move robot
 
-        touch_next = np.unravel_index(max_index_flat, values2d.shape)
-        #o_next = torch.tensor(touch_next).float() #get next observation
-        if display:
-            resized = cv2.resize(values2d, dim, interpolation=cv2.INTER_AREA)
-            cv2.imshow('Skin Patch', cv2.applyColorMap(resized, cv2.COLORMAP_VIRIDIS))
-            cv2.waitKey(1)
-        #print('Exploration step:', n, 'touch_pre',touch_pre,'touch_next',touch_next,"choosen action:", action_performed,'max touch',np.minimum(vmax_pre,vmax_next))
-        # write data
-        csv_row.extend([action,target_position[0],target_position[1],touch_next[0],touch_next[1],np.minimum(vmax_pre,vmax_next)])
-        csv_writer.writerow(csv_row)
+            # flter and get the touch
+            ser.flushInput()
+            v_buff=[[] for i in range(nfilt)]
+            for i in range(nfilt):
+                v_buff[i] = get_raw_data()
 
-        # move up
-        #target_position[-1]=znotouch
-        #dexarm.move_to(*target_position,feedrate=ROBOT_SPEED,mode='G1', wait=True)
-        # compute the loss
-        #print('pre',vmax_pre,'next',vmax_next)
-        if vmax_pre>threshold and vmax_next>threshold:
-            counter_training+=1
-            with torch.no_grad():
-                identity = torch.eye(model.a_size).to(device)
-                state_diff = model.Q@o_next-model.Q@o_pre
-                prediction_error = state_diff - model.V[:,action]
-                desired = identity[action].T # TODO: maybe remove?
+                #update buffer
+                isTouch,values1d, values_2d, data_mean, threshold_buffer =get_tactile(v_buff[i],threshold_buffer)
+                #compute mean
+            values=v_buff[-1]#np.mean(v_buff,axis=0)
+            isTouch, values1d, values2d, data_mean, threshold_buffer = get_tactile(values,threshold_buffer)
 
-                # Core learning rules:
-                model.Q += -0.1 * torch.outer(prediction_error, o_next)#TODO:o.T?
-                model.V[:,action] += 0.01 * prediction_error
-                if norm:
-                    model.V.data = model.V / torch.norm(model.V, dim=0)
 
-                loss = nn.MSELoss()(prediction_error, torch.zeros_like(prediction_error))
-                loss_record.append(loss.cpu().item())
-                print("Epoch:", counter_training,"Loss ",loss.item())
-            #plt.clf
-            #plt.plot(loss_record, c='r')
-        #plt.pause(0.001)
-        #plt.draw()
-        if counter_training%200 == 0:
-            torch.save(model.state_dict(), f'./checkpoint{name}{counter_training}.pt')
+
+            block_touch_next,touch_next,touch = pressure2touch(values1d)
+            vmax_next=np.max(values_2d)
+            o_next = torch.tensor(touch).float() #get observation
+
+            if display:
+                resized = cv2.resize(values2d, dim, interpolation=cv2.INTER_AREA)
+                cv2.imshow('Skin Patch', cv2.applyColorMap(resized, cv2.COLORMAP_VIRIDIS))
+                cv2.waitKey(1)
+
+            # write data
+
+
+            # move up
+            #target_position[-1]=znotouch
+            #dexarm.move_to(*target_position,feedrate=ROBOT_SPEED,mode='G1', wait=True)
+            # compute the loss
+            #print('pre',vmax_pre,'next',vmax_next)
+            if vmax_pre>threshold and vmax_next>threshold:
+                #write data
+
+                #train
+                counter_training+=1
+                with torch.no_grad():
+                    identity = torch.eye(model.a_size).to(device)
+                    state_diff = model.Q@o_next-model.Q@o_pre
+                    prediction_error = state_diff - model.V[:,action]
+                    desired = identity[action].T # TODO: maybe remove?
+
+                    # Core learning rules:
+                    model.Q += -0.1 * torch.outer(prediction_error, o_next)#TODO:o.T?
+                    model.V[:,action] += 0.01 * prediction_error
+                    if norm:
+                        model.V.data = model.V / torch.norm(model.V, dim=0)
+
+                    loss = nn.MSELoss()(prediction_error, torch.zeros_like(prediction_error))
+                    loss_record.append(loss.cpu().item())
+                    print("trajectory:", n, "Epoch:", counter_training,"Loss ",loss.item())
+                    #print data
+                    csv_row=[]
+                    csv_row.extend([target_position_pre[0],target_position_pre[1],block_touch_pre,touch_pre[0],touch_pre[1]])
+                    csv_row.extend([action,target_position[0],target_position[1],block_touch_next,touch_next[0],touch_next[1],np.minimum(vmax_pre,vmax_next),loss.item()])
+                    csv_writer.writerow(csv_row)
+                #plt.clf
+                #plt.plot(loss_record, c='r')
+            o_pre = o_next
+            touch_pre = touch_next[:]
+            block_touch_pre = block_touch_next
+            target_position_pre=target_position[:]
+            vmax_pre=vmax_next
+            #plt.pause(0.001)
+            #plt.draw()
+            if counter_training%200 == 0:
+                torch.save(model.state_dict(), f'./checkpoint{name}{counter_training}.pt')
+            if not n%10:
+                break #new trajectory
+
+        if n>N_exploration:
+            break
 
 
 

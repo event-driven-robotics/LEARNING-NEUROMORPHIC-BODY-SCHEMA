@@ -25,9 +25,9 @@ ztouch=-82
 #corner1=[-20,280,z]
 #corner2=[179,215,z]
 #corner3=[206,298,z]
-corner1=[20,270,z]
-corner2=[119,245,z]
-corner3=[130,308,z]
+corner1=[-20,280,z]
+corner2=[179,220,z]
+corner3=[201,303,z]
 #corner4=[-3,374,z]
 
 

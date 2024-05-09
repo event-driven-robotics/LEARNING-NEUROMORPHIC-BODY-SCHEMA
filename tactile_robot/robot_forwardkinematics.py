@@ -214,6 +214,13 @@ def random_action():
     action[1] = random.uniform(-ANGLE_STEP, ANGLE_STEP)
     return action
 
+def random_config():
+    global MAX_ANGLE1, MAX_ANGLE2, MIN_ANGLE1, MIN_ANGLE2
+    angle=[[0],[0]]
+    angle[0] = random.uniform(MIN_ANGLE1, MAX_ANGLE2)
+    angle[1] = random.uniform(MIN_ANGLE2, MAX_ANGLE2)
+    return angle
+
 def move_to_next_angle(theta,action,corners):
     global ANGLE_STEP, MAX_ANGLE1, MAX_ANGLE2, MIN_ANGLE1, MIN_ANGLE2
 
