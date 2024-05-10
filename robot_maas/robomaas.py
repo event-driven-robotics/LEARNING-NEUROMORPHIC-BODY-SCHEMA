@@ -15,28 +15,10 @@ class Agent(nn.Module):
         self.device = device
 
     def forward(self, o_pre, action, o_next):
-        """
-        o_pre (o_size,1)
-        o_next (o_size,1)
-        """
-
         prediction_error = self.Q@o_next-(self.Q@o_pre+self.V[:,action])
         return prediction_error
 
-    # def plan(self, start, goal, env):
-    #     a_record = []
-    #     o_record = []
-    #     loc = start
-    #     for i in range(self.o_size):
-    #         o_record.append(loc)
-    #         if loc==goal:
-    #             return i, o_record
-    #         loc, action = self.move_one_step(loc, goal, a_record,)
-    #         a_record.append(action)
-
-    #     return i, o_record
-
-    def move_one_step(self, loc, goal, a_record, affordance):#TODO: delte last arg
+    def move_one_step(self, loc, goal, a_record, affordance):
         """affordance = allowed actions (list)
         a_record has to be empty
         """
@@ -54,39 +36,27 @@ class Agent(nn.Module):
         action_idx = torch.argmax(utility).item()
 
         print("affordance_vector",affordance_vector.detach().numpy(),"utility", utility.detach().numpy(), "action_udx", action_idx)
-        return action_idx # TODO: chenge where method is called
+        return action_idx
     
-if __name__ == '__main__':
+    def move_one_step_8(self, loc, goal, a_record, affordance):
+        affordance_vector = torch.ones(2*self.a_size, device=self.device) * (-1e6)
+        affordance_vector[affordance] = 0
+        affordance_vector_fix = affordance_vector.clone()
+        not_recommended_actions = a_record
+        affordance_vector_fix[not_recommended_actions] *= 0.
 
-    norm=False
-    model = Agent(o_size=2, a_size=8, s_dim=1000)
-    device = 'cpu'
-    loss_record = []
+        delta = self.Q@goal-self.Q@loc
 
-    plt.figure()
+        V_diag = self.V + self.V.roll(1, 1)
+        utility = ((torch.cat([self.V, V_diag], dim=1)).T@delta) + affordance_vector
 
-    while True:
-        # training step
-        with torch.no_grad():
-            o_pre = torch.tensor([14., 72.])
-            action = 0
-            o_next = torch.tensor([14., 72.])
+        action_idx = torch.argmax(utility).item()
 
-            identity = torch.eye(model.a_size).to(device)
-            state_diff = model.Q@o_next-model.Q@o_pre
-            prediction_error = state_diff - model.V[:,action]
-            desired = identity[action].T # TODO: maybe remove?
+        print("affordance_vector",affordance_vector.detach().numpy(),"utility", utility.detach().numpy(), "action_udx", action_idx)
+        return action_idx
+    
 
-            # Core learning rules:
-            print(model.Q.shape, prediction_error.shape, o_next.shape, torch.outer(prediction_error, o_next).shape)
-            model.Q += -0.1 * torch.outer(prediction_error, o_next)#TODO:o.T?
-            model.V[:,action] += 0.01 * prediction_error
-            if norm:
-                model.V.data = model.V / torch.norm(model.V, dim=0)
-
-            loss = nn.MSELoss()(prediction_error, torch.zeros_like(prediction_error))
-            loss_record.append(loss.cpu().item())
-
-            plt.plot(loss_record)
-            plt.pause(0.001)
-            plt.draw()
+# TODO: remove!
+ACTION_SPACE = torch.tensor(ACTION_SPACE)
+ACTION_SPACE_DIAG = ACTION_SPACE + ACTION_SPACE.roll(1, 1)
+ACTION_SPACE = torch.cat([ACTION_SPACE, ACTION_SPACE_DIAG], dim=1)
