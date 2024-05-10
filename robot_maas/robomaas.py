@@ -53,7 +53,7 @@ class Agent(nn.Module):
 
         action_idx = torch.argmax(utility).item()
 
-        print("affordance_vector",affordance_vector.detach().numpy(),"utility", utility.detach().numpy(), "action_udx", action_idx)
+        print("utility", utility.detach().numpy(), "action_udx", action_idx,"affordance_vector",affordance_vector.detach().numpy(),)
         return action_idx # TODO: chenge where method is called
     
 if __name__ == '__main__':
@@ -79,8 +79,11 @@ if __name__ == '__main__':
 
             # Core learning rules:
             print(model.Q.shape, prediction_error.shape, o_next.shape, torch.outer(prediction_error, o_next).shape)
-            model.Q += -0.1 * torch.outer(prediction_error, o_next)#TODO:o.T?
-            model.V[:,action] += 0.01 * prediction_error
+            #model.Q += -0.1 * torch.outer(prediction_error, o_next)#TODO:o.T?
+            #model.V[:,action] += 0.01 * prediction_error
+            # for 2D increase
+            model.Q += -0.5 * torch.outer(prediction_error, o_next)#TODO:o.T?
+            model.V[:,action] += 0.5 * prediction_error
             if norm:
                 model.V.data = model.V / torch.norm(model.V, dim=0)
 

@@ -21,7 +21,7 @@ from datetime import datetime
 
 from robomaas import Agent
 # file name where you want the data to be stored
-name="final"
+name="xy_block2p2"
 #csv_filename = os.path.join(os.getcwd(), "exploration_may8_1505.csv")
 csv_filename = f"{os.getcwd()}/{name}.csv"
 
@@ -60,22 +60,25 @@ znotouch=-80
 ztouch=-86
 z=ztouch
 INITIAL_POSITION = [60,250,ztouch]
-SCALING = 1/5 #scaling from action to euclidean position
-ROBOT_SPEED = 20000
+SCALING = 1/7 #scaling from action to euclidean position
+ROBOT_SPEED = 10000
 
-ACTION_SPACE=[[0,1],[1,0],[0,-1],[-1,0]]
+#ACTION_SPACE=[[0,1],[1,0],[0,-1],[-1,0]]
 
-N_exploration = 5000
+N_exploration = 20000
 ###################### DEFINE WORKING SPACE ##################################
 
 # corner1=[-40,283,z]
 # corner2=[179,215,z]
 # corner3=[206,298,z]
 
-corner1=[-20,280,z]
-corner2=[179,220,z]
-corner3=[201,303,z]
+# corner1=[-20,280,z]
+# corner2=[179,220,z]
+# corner3=[201,303,z]
 
+corner1=[-20,270,z]
+corner2=[179,210,z]
+corner3=[201,303,z]
 # corner1=[20,270,z]
 # corner2=[119,245,z]
 # corner3=[130,308,z]
@@ -229,10 +232,14 @@ def pressure2touch(values1d):
     # touch[max_index_flat]=1
     # o_pre = torch.tensor(touch).float() #get observation
 
-    block_id_2d=[np.maximum((max_index_2d[0]-1),0)//3,np.maximum((max_index_2d[1]-1),0)//3]
-    block_id_flat=block_id_2d[0]*7+block_id_2d[1]
+    #block_id_2d=[np.maximum((max_index_2d[0]-1),0)//3,np.maximum((max_index_2d[1]-1),0)//3]
+    block_id_2d=[max_index_2d[0]//2,max_index_2d[1]//2]
+    #block_id_flat=block_id_2d[0]*7+block_id_2d[1]
+    block_id_flat=block_id_2d[0]*10+block_id_2d[1]
+    #print('\rblobk',block_id_2d,'id',max_index_2d,'idlin',block_id_flat)
     #print('block_touch', block_touch_pre, 'touche ', touch_pre)
-    touch = np.zeros(28,)
+    #touch = np.zeros(28,)
+    touch = np.zeros(60,)
     touch[block_id_flat]=1
     return block_id_flat,block_id_2d,touch
 
@@ -333,6 +340,13 @@ def random_action():
     action[0] = random.uniform(-ANGLE_STEP, ANGLE_STEP)
     action[1] = random.uniform(-ANGLE_STEP, ANGLE_STEP)
     return action
+
+def random_config():
+    global MAX_ANGLE1, MAX_ANGLE2, MIN_ANGLE1, MIN_ANGLE2
+    angle=[[0],[0]]
+    angle[0] = random.uniform(MIN_ANGLE1, MAX_ANGLE2)
+    angle[1] = random.uniform(MIN_ANGLE2, MAX_ANGLE2)
+    return angle
 
 def move_to_next_angle(theta,action,corners):
     global ANGLE_STEP, MAX_ANGLE1, MAX_ANGLE2, MIN_ANGLE1, MIN_ANGLE2
@@ -448,7 +462,7 @@ dexarm.go_home()
 
 # init agent
 norm=False
-model = Agent(o_size=28, a_size=4, s_dim=1000)
+model = Agent(o_size=60, a_size=4, s_dim=1000)
 device = 'cpu'
 loss_record = []
 
@@ -578,7 +592,7 @@ with open(csv_filename, mode='w', newline='') as csv_file:
 
 
 torch.save(model.state_dict(), './checkpoint')
-
+dexarm.go_home()
 # model = TheModelClass(*args, **kwargs)
 # model.load_state_dict(torch.load(PATH))
 # model.eval()
