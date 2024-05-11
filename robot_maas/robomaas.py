@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -55,7 +55,24 @@ class Agent(nn.Module):
 
         print("utility", utility.detach().numpy(), "action_udx", action_idx,"affordance_vector",affordance_vector.detach().numpy(),)
         return action_idx # TODO: chenge where method is called
-    
+
+    def move_one_step_8(self, loc, goal, a_record, affordance):
+        affordance_vector = torch.ones(2*self.a_size, device=self.device) * (-1e6)
+        affordance_vector[affordance] = 0
+        affordance_vector_fix = affordance_vector.clone()
+        not_recommended_actions = a_record
+        affordance_vector_fix[not_recommended_actions] *= 0.
+
+        delta = self.Q@goal-self.Q@loc
+
+        V_diag = self.V[:,[2,0,3,1]] + self.V[:,[2,0,3,1]].roll(1, 1)
+        utility = ((torch.cat([self.V, V_diag/1.1], dim=1)).T@delta) + affordance_vector
+
+        action_idx = torch.argmax(utility).item()
+
+        print("affordance_vector",affordance_vector.detach().numpy(),"utility", utility.detach().numpy(), "action_udx", action_idx)
+        return action_idx
+
 if __name__ == '__main__':
 
     norm=False
@@ -79,11 +96,8 @@ if __name__ == '__main__':
 
             # Core learning rules:
             print(model.Q.shape, prediction_error.shape, o_next.shape, torch.outer(prediction_error, o_next).shape)
-            #model.Q += -0.1 * torch.outer(prediction_error, o_next)#TODO:o.T?
-            #model.V[:,action] += 0.01 * prediction_error
-            # for 2D increase
-            model.Q += -0.5 * torch.outer(prediction_error, o_next)#TODO:o.T?
-            model.V[:,action] += 0.5 * prediction_error
+            model.Q += -0.1 * torch.outer(prediction_error, o_next)#TODO:o.T?
+            model.V[:,action] += 0.01 * prediction_error
             if norm:
                 model.V.data = model.V / torch.norm(model.V, dim=0)
 
@@ -93,3 +107,4 @@ if __name__ == '__main__':
             plt.plot(loss_record)
             plt.pause(0.001)
             plt.draw()
+

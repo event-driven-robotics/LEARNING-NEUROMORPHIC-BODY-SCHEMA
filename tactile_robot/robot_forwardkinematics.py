@@ -44,7 +44,7 @@ threshold = 100 # threshold for detecting tactile events
 N = 5 #buffer size for filtering
 threshold_buffer = [[] for _ in range(252)] # Initialize a buffer to store values below the threshold
 #################### EXPERIMENTATION PARAMETERS #################################
-ARM_LENGTHS=[200,220]
+ARM_LENGTHS=[300,300]
 ROBOT_ORIGIN = [0,0]
 #ANGLE_STEP=math.pi/32
 ANGLE_STEP=math.pi/32

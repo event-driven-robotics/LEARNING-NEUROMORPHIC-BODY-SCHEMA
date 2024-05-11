@@ -1,0 +1,22 @@
+PROPRIO_SENSOR_NUMBER = 10  # Number of proprio sensors for each angle.
+PROPRIO_SENSOR_GRID_SIZE_2 = (MAX_ANGLE2 - MIN_ANGLE2) / (PROPRIO_SENSOR_NUMBER - 1) # distance between centers of receptive field
+PROPRIO_SENSOR_GRID_SIZE_1 = (MAX_ANGLE1 - MIN_ANGLE1) / (PROPRIO_SENSOR_NUMBER - 1) #
+RECEPTIVE_FIELD_SIZE_PROPRIO_1 = PROPRIO_SENSOR_GRID_SIZE_1 * .6 #receptive field size
+RECEPTIVE_FIELD_SIZE_PROPRIO_2 = PROPRIO_SENSOR_GRID_SIZE_2 * .6 #receptive field size
+
+def angle2popcode(angle1,angle2):
+    #population code of proprio
+    proprio_code = []
+
+    #first part of prioprio vector is angle coding from shoulder angle
+    for i in range(PROPRIO_SENSOR_NUMBER):
+        x = i * PROPRIO_SENSOR_GRID_SIZE_1 + MIN_ANGLE1
+        distance = np.abs(angle1 - x)
+        activation = np.exp(-distance / RECEPTIVE_FIELD_SIZE_PROPRIO_1)
+        proprio_code.append(activation)
+    #second part of proprio vector is angle coding from elbow angle
+    for i in range(PROPRIO_SENSOR_NUMBER):
+        x = i * PROPRIO_SENSOR_GRID_SIZE_2 + MIN_ANGLE2
+        distance = np.abs(angle2 - x)
+        activation = np.exp(-distance / RECEPTIVE_FIELD_SIZE_PROPRIO_2)
+        proprio_code.append(activation)
