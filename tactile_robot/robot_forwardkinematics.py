@@ -24,7 +24,7 @@ if display:
     height = int(img.shape[0] * scale_percent / 100)
     dim = (width, height)
 # file name where you want the data to be stored
-csv_filename = os.path.join(os.getcwd(), "tool_l2plus20mm.csv")
+csv_filename = os.path.join(os.getcwd(), "dvs.csv")
 
 #################### ROBOT ############################################################
 try:
